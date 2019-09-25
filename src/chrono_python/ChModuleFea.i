@@ -236,10 +236,10 @@ using namespace chrono::fea;
 %shared_ptr(chrono::fea::ChBuilderBeam)
 %shared_ptr(chrono::fea::ChBuilderBeamIGA)
 %shared_ptr(chrono::fea::ChBuilderBeamANCF)
-%shared_ptr(chrono::fea::ChLoaderBeamWrench)
+/*%shared_ptr(chrono::fea::ChLoaderBeamWrench)
 %shared_ptr(chrono::fea::ChLoadBeamWrench)
 %shared_ptr(chrono::fea::ChLoaderBeamWrenchDistributed)
-%shared_ptr(chrono::fea::ChLoadBeamWrenchDistributed)
+%shared_ptr(chrono::fea::ChLoadBeamWrenchDistributed)*/
 %shared_ptr(chrono::fea::ChExtruderBeamEuler)
 %shared_ptr(chrono::fea::ChExtruderBeamIGA)
 %shared_ptr(chrono::fea::ChVisualizationFEAmesh)
@@ -351,8 +351,10 @@ using namespace chrono::fea;
 %include "../chrono/fea/ChLinkDirFrame.h"
 %include "../chrono/fea/ChLinkPointFrame.h"
 %include "../chrono/fea/ChLinkPointPoint.h"
-%template(ChLoadBWD) std::shared_ptr< chrono::ChLoad< std::shared_ptr< chrono::fea::ChLoaderBeamWrenchDistributed> > > ;
+
+
 %include "../chrono/fea/ChLoadsBeam.h"
+%template(ChLoadBWD) std::shared_ptr< chrono::ChLoad< chrono::fea::ChLoaderBeamWrenchDistributed>  > ;
 %include "../chrono/fea/ChBuilderBeam.h"
 %include "../chrono/fea/ChMeshFileLoader.h"
 
