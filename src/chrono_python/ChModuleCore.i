@@ -366,6 +366,8 @@ using namespace chrono::fea;
 %include "ChProximityContainer.i"
 
 %include "ChLoad.i"
+%include "ChLoadsBody.i"
+%include "ChLoadsXYZnode.i"
 %include "ChLoadContainer.i"
 
 %include "ChShaft.i"

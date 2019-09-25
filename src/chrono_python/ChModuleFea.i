@@ -89,6 +89,8 @@
 #include "chrono/fea/ChLinkPointPoint.h"
 #include "chrono/fea/ChMeshFileLoader.h"
 #include "Eigen/src/Core/util/Memory.h"
+#include "chrono/physics/ChLoad.h"
+#include "chrono/fea/ChLoadsBeam.h"
 
 using namespace chrono;
 using namespace chrono::fea;
@@ -150,9 +152,6 @@ using namespace chrono::fea;
 %shared_ptr(chrono::ChObj)
 %shared_ptr(chrono::ChPhysicsItem)
 %shared_ptr(chrono::ChIndexedNodes)
-%shared_ptr(chrono::ChLoadBase)
-%shared_ptr(chrono::ChLoadCustom)
-%shared_ptr(chrono::ChLoadCustomMultiple)
 %shared_ptr(chrono::ChNodeBase) 
 %shared_ptr(chrono::ChNodeXYZ) 
 //from this module:
@@ -287,15 +286,14 @@ using namespace chrono::fea;
 %feature("director") chrono::ChLoadableU;
 %feature("director") chrono::ChLoadableUV;
 %feature("director") chrono::ChLoadableUVW;
-%import(module = "pychrono.core") "ChLoadable.i" // disable because strange error in cxx
-%import(module = "pychrono.core") "../chrono/physics/ChLoad.h"
+%import(module = "pychrono.core") "ChLoadable.i" 
+%import(module = "pychrono.core") "ChLoad.i" 
 %import(module = "pychrono.core") "../chrono/physics/ChNodeBase.h"
 %import(module = "pychrono.core") "../chrono/physics/ChNodeXYZ.h"
 %import(module = "pychrono.core") "ChContactContainer.i"
 
 
 //  core/  classes
-%include "../chrono/physics/ChPhysicsItem.h"
 %include "../chrono/fea/ChContinuumMaterial.h"
 %ignore chrono::fea::ChNodeFEAbase::ComputeKRMmatricesGlobal;
 %include "../chrono/fea/ChNodeFEAbase.h"
@@ -353,6 +351,7 @@ using namespace chrono::fea;
 %include "../chrono/fea/ChLinkDirFrame.h"
 %include "../chrono/fea/ChLinkPointFrame.h"
 %include "../chrono/fea/ChLinkPointPoint.h"
+%template(ChLoadBWD) std::shared_ptr< chrono::ChLoad< std::shared_ptr< chrono::fea::ChLoaderBeamWrenchDistributed> > > ;
 %include "../chrono/fea/ChLoadsBeam.h"
 %include "../chrono/fea/ChBuilderBeam.h"
 %include "../chrono/fea/ChMeshFileLoader.h"
