@@ -495,6 +495,7 @@ add_subdirectory(chrono_distributed)
 #add_subdirectory(chrono_ogre)
 add_subdirectory(chrono_vehicle)
 add_subdirectory(chrono_fsi)
+add_subdirectory(chrono_robosimian)
 
 # Add directories for model libraries
 add_subdirectory(chrono_models)
@@ -603,6 +604,12 @@ if(ENABLE_MODULE_VEHICLE)
   set(CHRONO_VEHICLE "#define CHRONO_VEHICLE")
 else()
   set(CHRONO_VEHICLE "#undef CHRONO_VEHICLE")
+endif()
+
+if(ENABLE_MODULE_ROBOSIMIAN)
+  set(CHRONO_ROBOSIMIAN "#define CHRONO_ROBOSIMIAN")
+else()
+  set(CHRONO_ROBOSIMIAN "#undef CHRONO_ROBOSIMIAN")
 endif()
 
 if(ENABLE_MODULE_FSI)
