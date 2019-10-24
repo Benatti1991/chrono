@@ -23,7 +23,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "chrono_robosimian/ChApiRoboSimian.h"
+#include "chrono_models/robosimian/ChApiRoboSimian.h"
 #include "chrono/assets/ChColor.h"
 #include "chrono/physics/ChLinkMotorRotation.h"
 #include "chrono/physics/ChSystem.h"

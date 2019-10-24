@@ -65,9 +65,9 @@
 
 #include "Eigen/src/Core/util/Memory.h"
 
-#include "chrono_robosimian/ChApiRoboSimian.h"
-#include "chrono_robosimian/robosimian.h"
-#include "chrono_robosimian/driver_cb.h"
+#include "chrono_models/robosimian/ChApiRoboSimian.h"
+#include "chrono_models/robosimian/robosimian.h"
+#include "chrono_models/robosimian/driver_cb.h"
 
 using namespace chrono;
 using namespace chrono::robosimian;
@@ -190,8 +190,8 @@ Before adding a shared_ptr, mark as shared ptr all its inheritance tree in the m
 %rename(CollisionFlags_COLLISION) chrono::robosimian::CollisionFlags::CHASSIS;
 %ignore chrono::robosimian::Driver::GetCurrentPhase;
 %feature("director")  chrono::robosimian::Driver::PhaseChangeCallback;
-%include "../chrono_robosimian/robosimian.h"
-%include "../chrono_robosimian/driver_cb.h"
+%include "../chrono_models/robosimian/robosimian.h"
+%include "../chrono_models/robosimian/driver_cb.h"
 
 // Tracked vehicles are not going to be wrapped in the short term
 

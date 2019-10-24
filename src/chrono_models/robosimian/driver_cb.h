@@ -17,7 +17,7 @@
 #ifndef ROBO_DRIVER_CB_H
 #define ROBO_DRIVER_CB_H
 
-#include "chrono_robosimian/robosimian.h"
+#include "chrono_models/robosimian/robosimian.h"
 
 namespace chrono {
 namespace robosimian {

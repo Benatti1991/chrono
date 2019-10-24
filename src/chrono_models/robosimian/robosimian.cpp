@@ -30,7 +30,7 @@
 #include "chrono/physics/ChSystemNSC.h"
 #include "chrono/physics/ChSystemSMC.h"
 
-#include "chrono_robosimian/robosimian.h"
+#include "chrono_models/robosimian/robosimian.h"
 
 
 namespace chrono {

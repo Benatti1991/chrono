@@ -16,19 +16,19 @@ MESSAGE(STATUS "==== Chrono Robosimian module ====")
 #-----------------------------------------------------------------------------
 # LIST THE FILES THAT MAKE THE ROBOSIMIAN LIBRARY
 
-SET(ChronoEngine_ROBOSIMIAN_SOURCES 
+SET(ChronoModels_robosimian_SOURCES 
     robosimian.cpp
 )
 
-SET(ChronoEngine_ROBOSIMIAN_HEADERS
+SET(ChronoModels_robosimian_HEADERS
     ChApiRoboSimian.h
 	robosimian.h 
 	driver_cb.h
 )
 
 SOURCE_GROUP("" FILES 
-            ${ChronoEngine_ROBOSIMIAN_SOURCES} 
-            ${ChronoEngine_ROBOSIMIAN_HEADERS})
+            ${ChronoModels_robosimian_SOURCES} 
+            ${ChronoModels_robosimian_HEADERS})
 
 #-----------------------------------------------------------------------------	
 # In most cases, you do not need to edit the lines below.
@@ -36,26 +36,26 @@ SOURCE_GROUP("" FILES
 # The ROBOSIMIAN library is added to the project,
 # and some custom properties of this target are set.
 
-ADD_LIBRARY(ChronoEngine_robosimian SHARED 
-			${ChronoEngine_ROBOSIMIAN_SOURCES}
-			${ChronoEngine_ROBOSIMIAN_HEADERS})
+ADD_LIBRARY(ChronoModels_robosimian SHARED 
+			${ChronoModels_robosimian_SOURCES}
+			${ChronoModels_robosimian_HEADERS})
 
-SET_TARGET_PROPERTIES(ChronoEngine_robosimian PROPERTIES
+SET_TARGET_PROPERTIES(ChronoModels_robosimian PROPERTIES
                       COMPILE_FLAGS "${CH_CXX_FLAGS}"
                       LINK_FLAGS "${CH_LINKERFLAG_SHARED}"
 					  COMPILE_DEFINITIONS "CH_API_COMPILE_ROBOSIMIAN")
                           
-TARGET_LINK_LIBRARIES(ChronoEngine_robosimian 
+TARGET_LINK_LIBRARIES(ChronoModels_robosimian 
 	                  ChronoEngine)
 	
-ADD_DEPENDENCIES(ChronoEngine_robosimian ChronoEngine)
+ADD_DEPENDENCIES(ChronoModels_robosimian ChronoEngine)
 	
-INSTALL(TARGETS ChronoEngine_robosimian
+INSTALL(TARGETS ChronoModels_robosimian
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)		
 
-INSTALL(FILES ${ChronoEngine_robosimian_HEADERS}
+INSTALL(FILES ${ChronoModels_robosimian_HEADERS}
         DESTINATION include/chrono_robosimian)
 
 
