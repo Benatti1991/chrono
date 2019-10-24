@@ -189,6 +189,7 @@ Before adding a shared_ptr, mark as shared ptr all its inheritance tree in the m
 %rename(VisualizationType_COLLISION) chrono::robosimian::VisualizationType::COLLISION;
 %rename(CollisionFlags_COLLISION) chrono::robosimian::CollisionFlags::CHASSIS;
 %ignore chrono::robosimian::Driver::GetCurrentPhase;
+%feature("director")  chrono::robosimian::Driver::PhaseChangeCallback;
 %include "../chrono_robosimian/robosimian.h"
 %include "../chrono_robosimian/driver_cb.h"
 
