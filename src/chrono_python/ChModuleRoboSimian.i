@@ -90,6 +90,7 @@ using namespace chrono::robosimian;
 
 %include "std_string.i"
 %include "std_vector.i"
+%include "std_array.i"
 %include "typemaps.i"
 
 // This is to enable references to double,int,etc. types in function parameters
@@ -97,6 +98,9 @@ using namespace chrono::robosimian;
 %pointer_class(double,double_ptr);
 %pointer_class(float,float_ptr);
 
+
+%template(vector_int) std::vector< int >;
+%template(limb_data) std::array<double, 8>;
 
 //
 // For each class, keep updated the  A, B, C sections: 

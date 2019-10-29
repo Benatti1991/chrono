@@ -18,7 +18,7 @@
 #include "chrono/ChVersion.h"
 #include "chrono/core/ChPlatform.h"
 
-// When compiling this library, remember to define CH_API_COMPILE_POSTPROCESS
+// When compiling this library, remember to define CH_API_COMPILE_ROBOSIMIAN
 // (so that the symbols with 'ChApiPostProcess' in front of them will be
 // marked as exported). Otherwise, just do not define it if you
 // link the library to your code, and the symbols will be imported.
