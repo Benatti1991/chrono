@@ -520,6 +520,15 @@ class ChApiRoboSimian Driver {
     /// Return the current limb motor actuations.
     Actuation GetActuation() { return m_actuations; }
 
+	/// Directly feed actuations to the motors.
+    void SetActuation(Actuation ext_act) { m_actuations = ext_act; }
+
+	/// Set the driving mode to accept external inputs.
+    void SetDrivingMode(bool drivemode) { driven = drivemode; }
+
+	/// Set the motor type (setpoint/torque).
+    void UseTorqueMotors(bool use_tm) { torque_actuated = use_tm; }
+
     /// Return the current phase
     std::string GetCurrentPhase() const { return m_phase_names[m_phase]; }
 
@@ -552,6 +561,8 @@ class ChApiRoboSimian Driver {
     Actuation m_actuations_2;         ///< cached actuations (after)
     Actuation m_actuations;           ///< current actuations
     PhaseChangeCallback* m_callback;  ///< user callback for phase change
+    bool driven = false;			  ///< True if the driver is expecting external inputs instead of reading from a file
+    bool torque_actuated = false;	  ///< Switch to true to use torque actuator instead of setpoints
 
     static const std::string m_phase_names[5];
 

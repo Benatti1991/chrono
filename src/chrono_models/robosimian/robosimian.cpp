@@ -32,7 +32,6 @@
 
 #include "chrono_models/robosimian/robosimian.h"
 
-
 namespace chrono {
 namespace robosimian {
 
@@ -690,6 +689,7 @@ void Driver::LoadDataLine(double& time, Actuation& activations) {
 }
 
 void Driver::Update(double time) {
+    bool ext_actuation = false;
     // In the POSE phase, use a logistic function to reach first data entry
     if (m_phase == POSE) {
         ax op;
@@ -745,23 +745,27 @@ void Driver::Update(double time) {
             break;
 
         case CYCLE:
-            while (t > m_time_2) {
-                m_time_1 = m_time_2;
-                m_actuations_1 = m_actuations_2;
-                if (m_ifs->eof()) {
-                    if (m_repeat) {
-                        m_ifs->clear();
-                        m_ifs->seekg(0);
-                        LoadDataLine(m_time_1, m_actuations_1);
-                        LoadDataLine(m_time_2, m_actuations_2);
-                        m_offset = time;
-                        std::cout << "time = " << time << " New cycle" << std::endl;
-                        if (m_callback)
-                            m_callback->OnPhaseChange(CYCLE, CYCLE);
-                    }
-                    return;
-                }
-                LoadDataLine(m_time_2, m_actuations_2);
+            if (!driven) {
+            		while (t > m_time_2) {
+					m_time_1 = m_time_2;
+					m_actuations_1 = m_actuations_2;
+					if (m_ifs->eof()) {
+						if (m_repeat) {
+							m_ifs->clear();
+							m_ifs->seekg(0);
+							LoadDataLine(m_time_1, m_actuations_1);
+							LoadDataLine(m_time_2, m_actuations_2);
+							m_offset = time;
+							std::cout << "time = " << time << " New cycle" << std::endl;
+							if (m_callback)
+								m_callback->OnPhaseChange(CYCLE, CYCLE);
+						}
+						return;
+					}
+					LoadDataLine(m_time_2, m_actuations_2);
+					}
+            } else {
+                ext_actuation = true;
             }
 
             break;
@@ -772,13 +776,15 @@ void Driver::Update(double time) {
     }
 
     // Interpolate  v = alpha_1 * v_1 + alpha_2 * v_2
-    axpby op;
-    op.a1 = (t - m_time_2) / (m_time_1 - m_time_2);
-    op.a2 = (t - m_time_1) / (m_time_2 - m_time_1);
-    for (int i = 0; i < 4; i++) {
-        std::transform(m_actuations_1[i].begin(), m_actuations_1[i].end(), m_actuations_2[i].begin(),
-                       m_actuations[i].begin(), op);
-    }
+    if (!ext_actuation) {
+            axpby op;
+            op.a1 = (t - m_time_2) / (m_time_1 - m_time_2);
+            op.a2 = (t - m_time_1) / (m_time_2 - m_time_1);
+            for (int i = 0; i < 4; i++) {
+                std::transform(m_actuations_1[i].begin(), m_actuations_1[i].end(), m_actuations_2[i].begin(),
+                               m_actuations[i].begin(), op);
+            }
+        }
 }
 
 // =============================================================================
@@ -1324,4 +1330,4 @@ void Limb::Translate(const ChVector<>& shift) {
 }
 
 }  // end namespace robosimian
-}
+}  // namespace chrono

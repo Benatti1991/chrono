@@ -101,6 +101,7 @@ using namespace chrono::robosimian;
 
 %template(vector_int) std::vector< int >;
 %template(limb_data) std::array<double, 8>;
+%template(Actuation) std::array<std::array<double, 8>, 4>;
 
 //
 // For each class, keep updated the  A, B, C sections: 
