@@ -156,7 +156,7 @@ void MakeAndRunDemo0(ChIrrApp& myapp) {
 // rod automatically divided in Nel elements:
 //
 
-void MakeAndRunDemo1(ChIrrApp& myapp, int nsections=32, int order=2) {
+void MakeAndRunDemo1(ChIrrApp& myapp, int nsections=3, int order=3) {
 
 	// Clear previous demo, if any:
 	myapp.GetSystem()->Clear();
@@ -755,59 +755,9 @@ int main(int argc, char* argv[]) {
 
 	// Run the sub-demos:
 
-	while (true) {
-		switch (ID_current_example) {
-		case 1:
-			/*
-			MakeAndRunDemo1(application, 4,1);
-			MakeAndRunDemo1(application, 8,1);
-			MakeAndRunDemo1(application,16,1);
-			MakeAndRunDemo1(application,32,1);
-			MakeAndRunDemo1(application,64,1);
-			MakeAndRunDemo1(application,512, 1);
-			MakeAndRunDemo1(application, 4, 2);
-			MakeAndRunDemo1(application, 8, 2);
-			MakeAndRunDemo1(application, 16, 2);
-			MakeAndRunDemo1(application, 32, 2);
-			MakeAndRunDemo1(application, 64, 2);
-			MakeAndRunDemo1(application, 512, 2);
-			MakeAndRunDemo1(application, 4, 3);
-			MakeAndRunDemo1(application, 8, 3);
-			MakeAndRunDemo1(application, 16, 3);
-			MakeAndRunDemo1(application, 32, 3);
-			MakeAndRunDemo1(application, 64, 3);
-			MakeAndRunDemo1(application, 512, 3);
-			MakeAndRunDemo1(application, 4, 4);
-			MakeAndRunDemo1(application, 8, 4);
-			MakeAndRunDemo1(application, 16, 4);
-			MakeAndRunDemo1(application, 32, 4);
-			MakeAndRunDemo1(application, 64, 4);
-			MakeAndRunDemo1(application, 512, 4);
-			MakeAndRunDemo1(application, 4, 5);
-			MakeAndRunDemo1(application, 8, 5);
-			MakeAndRunDemo1(application, 16, 5);
-			MakeAndRunDemo1(application, 32, 5);
-			MakeAndRunDemo1(application, 64, 5);
-			MakeAndRunDemo1(application, 512, 5);
-			system("pause");
-			*/
-			MakeAndRunDemo1(application, 64, 3);
-			break;
-		case 2:
-			MakeAndRunDemo2(application);
-			break;
-		case 3:
-			MakeAndRunDemo3(application);
-			break;
-		case 4:
-			MakeAndRunDemo4(application);
-			break;
-		default:
-			break;
-		}
-		if (!application.GetDevice()->run())
-			break;
-	}
+	
+	MakeAndRunDemo1(application, 3, 3);
+	
 
     return 0;
 }

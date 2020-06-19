@@ -61,11 +61,11 @@ void ChElementBeamIGA::SetNodesCubic(std::shared_ptr<ChNodeFEAxyzrot> nodeA, std
 void ChElementBeamIGA::SetNodesGenericOrder(std::vector<std::shared_ptr<ChNodeFEAxyzrot>> mynodes, std::vector<double> myknots, int myorder) {
     this->order = myorder;
 
-    nodes.resize(myorder + 1);
+    nodes.resize(mynodes.size());
     for (int i = 0; i< mynodes.size(); ++i) {
         nodes[i] = mynodes[i];
     }
-    knots.resize(nodes.size() + myorder + 1);
+    knots.resize(myknots.size());
     for (int i = 0; i < myknots.size(); ++i) {
         knots(i) = myknots[i];
     }
@@ -82,7 +82,7 @@ void ChElementBeamIGA::SetNodesGenericOrder(std::vector<std::shared_ptr<ChNodeFE
     // FULL OVER INTEGRATION:
     //int_order_b = myorder+1;
     // FULL EXACT INTEGRATION:
-    int_order_b = (int)std::ceil((this->order + 1.0) / 2.0);
+    int_order_b = (int)std::ceil((mynodes.size()) / 1.0);
     // REDUCED INTEGRATION:
     //int_order_b = myorder; 
     // SELECTIVE INTEGRATION:
@@ -97,33 +97,22 @@ void ChElementBeamIGA::SetNodesGenericOrder(std::vector<std::shared_ptr<ChNodeFE
     bool is_end_A = false;
     bool is_end_B = false;
 
-    double u1 = knots(order);
-    double u2 = knots(knots.size() - order - 1);
+    double u1 = 0;
+    double u2 = 1;
 
     if (u1 < 0.5 && u2 >= 0.5) {
         //GetLog() << " -- IS_MIDDLE ";
         is_middle = true;
     }
     // Full integration for end elements:
-    int multiplicity_a = 1;
-    int multiplicity_b = 1;
-    for (int im = order - 1; im >= 0; --im) {
-        if (knots(im) == knots(order)) // extreme of span
-            ++multiplicity_a;
-    }
-    for (int im = (int)knots.size() - order; im < (int)knots.size(); ++im) {
-        if (knots(im) == knots(knots.size() - order - 1))  // extreme of span
-            ++multiplicity_b;
-    }
-    if (multiplicity_a > 1)
-        is_end_A = true;
-    if (multiplicity_b > 1)
-        is_end_B = true;
+    // in the new formulation A and B are always end 
+	is_end_A = true;
+    is_end_B = true;
 
 
     if (this->quadrature_type == QuadratureType::FULL_EXACT) {
-        int_order_b = (int)std::ceil((this->order + 1.0) / 2.0);
-        int_order_s = (int)std::ceil((this->order + 1.0) / 2.0);
+        int_order_b = (int)std::ceil((mynodes.size()) / 1.0);
+        int_order_s = (int)std::ceil((mynodes.size()) / 1.0);
     }
     if (this->quadrature_type == QuadratureType::FULL_OVER) {
         int_order_b = myorder+1;
@@ -317,8 +306,8 @@ void ChElementBeamIGA::ComputeInternalForces(ChVectorDynamic<>& Fi) {
 
 void ChElementBeamIGA::ComputeInternalForces_impl(ChVectorDynamic<>& Fi, ChState& state_x, ChStateDelta& state_w, bool used_for_differentiation) {
     // get two values of absyssa at extreme of span
-    double u1 = knots(order);
-    double u2 = knots(knots.size() - order - 1);
+    double u1 = 0;
+    double u2 = 1;
 
     double c1 = (u2 - u1) / 2;
     double c2 = (u2 + u1) / 2;
@@ -350,10 +339,11 @@ void ChElementBeamIGA::ComputeInternalForces_impl(ChVectorDynamic<>& Fi, ChState
         double Jue = c1;
 
         // compute the basis functions N(u) at given u:
-        int nspan = order;
+        //int nspan = order;
+        int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
 
         ChMatrixDynamic<> N(2, (int)nodes.size()); // row n.0 contains N, row n.1 contains dN/du
-
+        N.setZero();
         geometry::ChBasisToolsBspline::BasisEvaluateDeriv(
             this->order,
             nspan,
@@ -511,8 +501,8 @@ void ChElementBeamIGA::ComputeInternalForces_impl(ChVectorDynamic<>& Fi, ChState
 
 inline void ChElementBeamIGA::ComputeNF(const double U, ChVectorDynamic<>& Qi, double& detJ, const ChVectorDynamic<>& F, ChVectorDynamic<>* state_x, ChVectorDynamic<>* state_w) {
     // get two values of absyssa at extreme of span
-    double u1 = knots(order);
-    double u2 = knots(knots.size() - order - 1);
+    double u1 = 0;
+    double u2 = 1;
 
     double c1 = (u2 - u1) / 2;
     double c2 = (u2 + u1) / 2;
@@ -521,10 +511,10 @@ inline void ChElementBeamIGA::ComputeNF(const double U, ChVectorDynamic<>& Qi, d
     double u = (c1 * U + c2);
 
     // compute the basis functions N(u) at given u:
-    int nspan = order;
+    int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
 
     ChMatrixDynamic<> N(2, (int)nodes.size()); // row n.0 contains N, row n.1 contains dN/du
-
+    N.setZero();
     geometry::ChBasisToolsBspline::BasisEvaluateDeriv(
         this->order,
         nspan,
@@ -573,8 +563,8 @@ void ChElementBeamIGA::SetupInitial(ChSystem* system) {
     this->length = 0;
 
     // get two values of absyssa at extreme of span
-    double u1 = knots(order);
-    double u2 = knots(knots.size() - order - 1);
+    double u1 = 0;
+    double u2 = 1;
 
     double c1 = (u2 - u1) / 2;
     double c2 = (u2 + u1) / 2;
@@ -592,10 +582,10 @@ void ChElementBeamIGA::SetupInitial(ChSystem* system) {
         double w = ChQuadrature::GetStaticTables()->Weight[int_order_s - 1][ig];
 
         // compute the basis functions N(u) at given u:
-        int nspan = order;
+        int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
 
         ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
-
+        N.setZero();
         geometry::ChBasisToolsBspline::BasisEvaluateDeriv(this->order, nspan, u, knots,
             N);  ///< here return N and dN/du
 
@@ -626,16 +616,19 @@ void ChElementBeamIGA::SetupInitial(ChSystem* system) {
         double w = ChQuadrature::GetStaticTables()->Weight[int_order_b - 1][ig];
 
         // compute the basis functions N(u) at given u:
-        int nspan = order;
+        int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
 
         ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
-
+        // TODO: check here. Basis and its derivative are evaluated only in the span, and are 0 outside it
+		N.setZero();
         geometry::ChBasisToolsBspline::BasisEvaluateDeriv(this->order, nspan, u, knots,
             N);  ///< here return N and dN/du
 
                  // compute reference spline gradient \dot{dr_0} = dr0/du
         ChVector<> dr0;
         for (int i = 0; i < nodes.size(); ++i) {
+            double pippo = nodes[i]->GetX0ref().coord.pos.Length();
+            double pluto = N(1, i);
             dr0 += nodes[i]->GetX0ref().coord.pos * N(1, i);
         }
         this->Jacobian_b[ig] = dr0.Length();  // J = |dr0/du|

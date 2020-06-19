@@ -178,23 +178,22 @@ void ChBuilderBeamIGA::BuildBeam(std::shared_ptr<ChMesh> mesh,                 /
     }
 
     // Create the single elements by picking a subset of the nodes and control points
-    for (int i_el = 0; i_el < N; ++i_el) {
-        std::vector<double> my_el_knots;
-        for (int i_el_knot = 0; i_el_knot < p + p + 1 + 1; ++i_el_knot) {
-            my_el_knots.push_back(myknots(i_el + i_el_knot));
-        }
-
-        std::vector<std::shared_ptr<ChNodeFEAxyzrot>> my_el_nodes;
-        for (int i_el_node = 0; i_el_node < p + 1; ++i_el_node) {
-            my_el_nodes.push_back(mynodes[i_el + i_el_node]);
-        }
-
-        auto belement_i = chrono_types::make_shared<ChElementBeamIGA>();
-        belement_i->SetNodesGenericOrder(my_el_nodes, my_el_knots, p);
-        belement_i->SetSection(sect);
-        mesh->AddElement(belement_i);
-        this->beam_elems.push_back(belement_i);
+ 
+    std::vector<double> my_el_knots;
+    for (int i_el_knot = 0; i_el_knot < N + p + p + 1; ++i_el_knot) {
+        my_el_knots.push_back(myknots(i_el_knot));
     }
+    /*
+    std::vector<std::shared_ptr<ChNodeFEAxyzrot>> my_el_nodes;
+    for (int i_el_node = 0; i_el_node < p + 1; ++i_el_node) {
+        my_el_nodes.push_back(mynodes[i_el_node]);
+    }
+	*/
+    auto belement_i = chrono_types::make_shared<ChElementBeamIGA>();
+    belement_i->SetNodesGenericOrder(mynodes, my_el_knots, p);
+    belement_i->SetSection(sect);
+    mesh->AddElement(belement_i);
+    this->beam_elems.push_back(belement_i);
 }
 
 void ChBuilderBeamIGA::BuildBeam(std::shared_ptr<ChMesh> mesh,                 // mesh to store the resulting elements
