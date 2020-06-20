@@ -353,7 +353,8 @@ class ChApi ChElementBeamIGA :  public ChElementBeam,
 
     int int_order_s;
     int int_order_b;
-
+    // index of the 1st knot span
+    int minspan = 3;
     std::vector<double> Jacobian_s;
     std::vector<double> Jacobian_b;
 

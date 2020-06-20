@@ -39,8 +39,6 @@ class ChApi ChBasisToolsBspline {
         // safeguards, and shortcut (p+1)-multiple end knots
         if (u >= knotU(n + 1))
             return n;
-        if (u <= knotU(p))
-            return p;
 
         int lo = p;
         int hi = n + 1;

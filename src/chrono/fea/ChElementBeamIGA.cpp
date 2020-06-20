@@ -341,20 +341,23 @@ void ChElementBeamIGA::ComputeInternalForces_impl(ChVectorDynamic<>& Fi, ChState
         // compute the basis functions N(u) at given u:
         //int nspan = order;
         int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
-
-        ChMatrixDynamic<> N(2, (int)nodes.size()); // row n.0 contains N, row n.1 contains dN/du
+        // The non-zero basis are stored in M, which fills N in the proper location
+        ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
+        ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
+        // Basis and its derivative are evaluated only in the span, and are 0 outside it
         N.setZero();
         geometry::ChBasisToolsBspline::BasisEvaluateDeriv(
             this->order,
             nspan,
             u,
             knots,
-            N);           ///< here return N and dN/du 
+            M);           ///< here return N and dN/du 
 
                           // interpolate rotation of section at given u, to compute R.
                           // Note: this is approximate.
                           // A more precise method: use quaternion splines, as in Kim,Kim and Shin, 1995 paper.
-        ChQuaternion<> q_delta;
+        N.block(0, nspan - minspan, 2, this->order + 1) = M;
+		ChQuaternion<> q_delta;
         ChVector<> da = VNULL;
         ChVector<> delta_rot_dir;
         double delta_rot_angle;
@@ -513,15 +516,18 @@ inline void ChElementBeamIGA::ComputeNF(const double U, ChVectorDynamic<>& Qi, d
     // compute the basis functions N(u) at given u:
     int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
 
-    ChMatrixDynamic<> N(2, (int)nodes.size()); // row n.0 contains N, row n.1 contains dN/du
+    // The non-zero basis are stored in M, which fills N in the proper location
+    ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
+    ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
+    // Basis and its derivative are evaluated only in the span, and are 0 outside it
     N.setZero();
     geometry::ChBasisToolsBspline::BasisEvaluateDeriv(
         this->order,
         nspan,
         u,
         knots,
-        N);           ///< h
-
+        M);           ///< h
+    N.block(0, nspan - minspan, 2, this->order + 1) = M;
     ChVector<> dr0;
     for (int i = 0; i< nodes.size(); ++i) {
         dr0 += nodes[i]->GetX0ref().coord.pos * N(1, i);
@@ -554,6 +560,8 @@ inline void ChElementBeamIGA::ComputeNF(const double U, const double V, const do
 
 void ChElementBeamIGA::SetupInitial(ChSystem* system) {
     assert(section);
+    // compute the min span:
+    this->minspan = geometry::ChBasisToolsBspline::FindSpan(this->order, 0.001, knots);
 
     if (this->section->GetPlasticity()) {
         this->section->GetPlasticity()->CreatePlasticityData(int_order_b, this->plastic_data_old);
@@ -584,11 +592,14 @@ void ChElementBeamIGA::SetupInitial(ChSystem* system) {
         // compute the basis functions N(u) at given u:
         int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
 
+        // The non-zero basis are stored in M, which fills N in the proper location
         ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
+        ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
+        // Basis and its derivative are evaluated only in the span, and are 0 outside it
         N.setZero();
         geometry::ChBasisToolsBspline::BasisEvaluateDeriv(this->order, nspan, u, knots,
-            N);  ///< here return N and dN/du
-
+            M);  ///< here return N and dN/du
+        N.block(0, nspan - minspan, 2, this->order + 1) = M;
                  // compute reference spline gradient \dot{dr_0} = dr0/du
         ChVector<> dr0;
         for (int i = 0; i < nodes.size(); ++i) {
@@ -617,18 +628,22 @@ void ChElementBeamIGA::SetupInitial(ChSystem* system) {
 
         // compute the basis functions N(u) at given u:
         int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
-
+		// The non-zero basis are stored in M, which fills N in the proper location
         ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
-        // TODO: check here. Basis and its derivative are evaluated only in the span, and are 0 outside it
+        ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
+        //Basis and its derivative are evaluated only in the span, and are 0 outside it
 		N.setZero();
         geometry::ChBasisToolsBspline::BasisEvaluateDeriv(this->order, nspan, u, knots,
-            N);  ///< here return N and dN/du
-
-                 // compute reference spline gradient \dot{dr_0} = dr0/du
+            M);  ///< here return N and dN/du
+        N.block(0, nspan-minspan, 2, this->order + 1) = M;
+        // compute reference spline gradient \dot{dr_0} = dr0/du
         ChVector<> dr0;
         for (int i = 0; i < nodes.size(); ++i) {
             double pippo = nodes[i]->GetX0ref().coord.pos.Length();
             double pluto = N(1, i);
+            double paperino = N(0, i);
+            int topolino = geometry::ChBasisToolsBspline::FindSpan(this->order, 0.001, knots);
+            int minnie = geometry::ChBasisToolsBspline::FindSpan(this->order, 0.999, knots);
             dr0 += nodes[i]->GetX0ref().coord.pos * N(1, i);
         }
         this->Jacobian_b[ig] = dr0.Length();  // J = |dr0/du|

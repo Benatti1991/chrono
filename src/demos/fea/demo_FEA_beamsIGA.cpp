@@ -756,7 +756,7 @@ int main(int argc, char* argv[]) {
 	// Run the sub-demos:
 
 	
-	MakeAndRunDemo1(application, 3, 3);
+	MakeAndRunDemo1(application, 5, 5);
 	
 
     return 0;
