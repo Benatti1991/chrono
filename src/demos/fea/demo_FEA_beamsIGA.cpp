@@ -469,8 +469,8 @@ void MakeAndRunDemo3(ChIrrApp& myapp) {
 		auto plasticdata = dynamic_cast<ChInternalDataLumpedCosserat*>(plasticdat);
 		
 		my_plasticfile << myapp.GetSystem()->GetChTime() << " "
-			<< builder.GetLastBeamElements()[0]->GetStrainE()[0].x() << " "
-			<< builder.GetLastBeamElements()[0]->GetStressN()[0].x() << " "
+			<< builder.GetLastBeamElements()[0]->GetStrainE()[0][0].x() << " "
+			<< builder.GetLastBeamElements()[0]->GetStressN()[0][0].x() << " "
 			<< plasticdata->p_strain_acc << " "
 			<< plasticdata->p_strain_e.x() << " "
 			<< mK(0, 0) << " "
@@ -755,9 +755,11 @@ int main(int argc, char* argv[]) {
 
 	// Run the sub-demos:
 
-	
-	MakeAndRunDemo1(application, 5, 5);
-	
+	for (int i = 3; i <= 10; i++) {
+        for (int j = 1; j <= 4; j++) {
+            MakeAndRunDemo1(application, i, 2*j+1);
+        }
+    }
 
     return 0;
 }

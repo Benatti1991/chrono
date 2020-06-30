@@ -82,7 +82,7 @@ void ChElementBeamIGA::SetNodesGenericOrder(std::vector<std::shared_ptr<ChNodeFE
     // FULL OVER INTEGRATION:
     //int_order_b = myorder+1;
     // FULL EXACT INTEGRATION:
-    int_order_b = (int)std::ceil((mynodes.size()) / 1.0);
+    int_order_b = (int)std::ceil((this->order + 1.0) / 2.0);
     // REDUCED INTEGRATION:
     //int_order_b = myorder; 
     // SELECTIVE INTEGRATION:
@@ -111,8 +111,8 @@ void ChElementBeamIGA::SetNodesGenericOrder(std::vector<std::shared_ptr<ChNodeFE
 
 
     if (this->quadrature_type == QuadratureType::FULL_EXACT) {
-        int_order_b = (int)std::ceil((mynodes.size()) / 1.0);
-        int_order_s = (int)std::ceil((mynodes.size()) / 1.0);
+        int_order_b = (int)std::ceil((this->order + 1.0) / 2.0);
+        int_order_s = (int)std::ceil((this->order + 1.0) / 2.0);
     }
     if (this->quadrature_type == QuadratureType::FULL_OVER) {
         int_order_b = myorder+1;
@@ -230,6 +230,7 @@ void ChElementBeamIGA::ComputeKRMmatricesGlobal(ChMatrixRef H, double Kfactor, d
             K.col(i) = Jcolumn;
         }
 
+
         // finally, store K into H:
         H.block(0, 0, mrows_w, mrows_w) = Kfactor * K;
     }
@@ -305,195 +306,181 @@ void ChElementBeamIGA::ComputeInternalForces(ChVectorDynamic<>& Fi) {
 }
 
 void ChElementBeamIGA::ComputeInternalForces_impl(ChVectorDynamic<>& Fi, ChState& state_x, ChStateDelta& state_w, bool used_for_differentiation) {
-    // get two values of absyssa at extreme of span
-    double u1 = 0;
-    double u2 = 1;
-
-    double c1 = (u2 - u1) / 2;
-    double c2 = (u2 + u1) / 2;
-
     // zero the Fi accumulator
     Fi.setZero();
+	for (int nspan = this->order; nspan <= knots.size() - 2 - this->order; nspan++) {
+        // get two values of absyssa at extreme of span
+        double u1 = knots[nspan];
+        double u2 = knots[nspan + 1];
 
-    // Do quadrature over the "s" shear Gauss points 
-    // (only if int_order_b != int_order_s, otherwise do a single loop later over "b" bend points also for shear)
+        double c1 = (u2 - u1) / 2;
+        double c2 = (u2 + u1) / 2;
 
-    //***TODO*** maybe not needed: separate bending and shear integration points. 
+        
 
+        // Do quadrature over the "s" shear Gauss points
+        // (only if int_order_b != int_order_s, otherwise do a single loop later over "b" bend points also for shear)
 
+        //***TODO*** maybe not needed: separate bending and shear integration points.
 
-    // Do quadrature over the "b" bend Gauss points
+        // Do quadrature over the "b" bend Gauss points
 
-    for (int ig = 0; ig < int_order_b; ++ig) {
+        for (int ig = 0; ig < int_order_b; ++ig) {
+            // absyssa in typical -1,+1 range:
+            double eta = ChQuadrature::GetStaticTables()->Lroots[int_order_b - 1][ig];
+            // absyssa in span range:
+            double u = (c1 * eta + c2);
+            // scaling = gauss weight
+            double w = ChQuadrature::GetStaticTables()->Weight[int_order_b - 1][ig];
 
-        // absyssa in typical -1,+1 range:
-        double eta = ChQuadrature::GetStaticTables()->Lroots[int_order_b - 1][ig];
-        // absyssa in span range:
-        double u = (c1 * eta + c2);
-        // scaling = gauss weight
-        double w = ChQuadrature::GetStaticTables()->Weight[int_order_b - 1][ig];
+            // Jacobian Jsu = ds/du
+            double Jsu = this->Jacobian_b(nspan, ig);
+            // Jacobian Jue = du/deta
+            double Jue = c1;
 
-        // Jacobian Jsu = ds/du
-        double Jsu = this->Jacobian_b[ig];
-        // Jacobian Jue = du/deta
-        double Jue = c1;
+            // compute the basis functions N(u) at given u:
+            // The non-zero basis are stored in M, which fills N in the proper location
+            ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
+            ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
+            // Basis and its derivative are evaluated only in the span, and are 0 outside it
+            N.setZero();
+            geometry::ChBasisToolsBspline::BasisEvaluateDeriv(this->order, nspan, u, knots,
+                                                              M);  ///< here return N and dN/du
 
-        // compute the basis functions N(u) at given u:
-        //int nspan = order;
-        int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
-        // The non-zero basis are stored in M, which fills N in the proper location
-        ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
-        ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
-        // Basis and its derivative are evaluated only in the span, and are 0 outside it
-        N.setZero();
-        geometry::ChBasisToolsBspline::BasisEvaluateDeriv(
-            this->order,
-            nspan,
-            u,
-            knots,
-            M);           ///< here return N and dN/du 
-
-                          // interpolate rotation of section at given u, to compute R.
-                          // Note: this is approximate.
-                          // A more precise method: use quaternion splines, as in Kim,Kim and Shin, 1995 paper.
-        N.block(0, nspan - minspan, 2, this->order + 1) = M;
-		ChQuaternion<> q_delta;
-        ChVector<> da = VNULL;
-        ChVector<> delta_rot_dir;
-        double delta_rot_angle;
-        for (int i = 0; i < nodes.size(); ++i) {
-            ChQuaternion<> q_i(state_x.segment(i * 7 + 3, 4));
-            q_delta = nodes[0]->coord.rot.GetConjugate() * q_i;
-            q_delta.Q_to_AngAxis(delta_rot_angle, delta_rot_dir); // a_i = dir_i*angle_i (in spline local reference, -PI..+PI)
-            da += delta_rot_dir * delta_rot_angle * N(0, i);  // a = N_i*a_i
-        }
-        ChQuaternion<> qda; qda.Q_from_Rotv(da);
-        ChQuaternion<> qR = nodes[0]->coord.rot * qda;
-
-
-        // compute the 3x3 rotation matrix R equivalent to quaternion above
-        ChMatrix33<> R(qR);
-
-        // compute abs. spline gradient r'  = dr/ds
-        ChVector<> dr;
-        for (int i = 0; i < nodes.size(); ++i) {
-            ChVector<> r_i(state_x.segment(i * 7, 3));
-            dr += r_i * N(1, i);  // dr/du = N_i'*r_i
-        }
-        // (note r'= dr/ds = dr/du du/ds = dr/du * 1/Jsu   where Jsu computed in SetupInitial)
-        dr *= 1.0 / Jsu;
-
-        // compute abs. time rate of spline gradient  dr'/dt
-        ChVector<> drdt;
-        for (int i = 0; i < nodes.size(); ++i) {
-            ChVector<> drdt_i(state_w.segment(i * 6, 3));
-            drdt += drdt_i * N(1, i);
-        }
-        drdt *= 1.0 / Jsu;
-
-        // compute abs spline rotation gradient q' = dq/ds 
-        // But.. easier to compute local gradient of spin vector a' = da/ds
-        da = VNULL;
-        for (int i = 0; i < nodes.size(); ++i) {
-            ChQuaternion<> q_i(state_x.segment(i * 7 + 3, 4));
-            q_delta = qR.GetConjugate() * q_i;
-            q_delta.Q_to_AngAxis(delta_rot_angle, delta_rot_dir); // a_i = dir_i*angle_i (in spline local reference, -PI..+PI)
-            da += delta_rot_dir * delta_rot_angle * N(1, i);  // da/du = N_i'*a_i
-        }
-        // (note a= da/ds = da/du du/ds = da/du * 1/Jsu   where Jsu computed in SetupInitial)
-        da *= 1.0 / Jsu;
-
-        // compute abs rate of spline rotation gradient da'/dt
-        ChVector<> dadt;
-        for (int i = 0; i < nodes.size(); ++i) {
-            ChQuaternion<> q_i(state_x.segment(i * 7 + 3, 4));
-            ChVector<> wl_i(state_w.segment(i * 6 + 3, 3)); //  w in node csys
-            ChVector<> w_i = q_i.Rotate(wl_i); // w in absolute csys
-            dadt += w_i * N(1, i);
-        }
-        dadt *= 1.0 / Jsu;
-
-        // compute local epsilon strain:  strain_e= R^t * r' - {1, 0, 0}
-        ChVector<> astrain_e = R.transpose() * dr - VECT_X - this->strain_e_0[ig];
-
-        // compute local time rate of strain:  strain_e_dt = R^t * dr'/dt
-        ChVector<> astrain_e_dt = R.transpose() * drdt;
-
-        // compute local curvature strain:  strain_k= 2*[F(q*)(+)] * q' = 2*[F(q*)(+)] * N_i'*q_i = R^t * a' = a'_local
-        ChVector<> astrain_k = da - this->strain_k_0[ig];
-
-        // compute local time rate of curvature strain:
-        ChVector<> astrain_k_dt = R.transpose() * dadt;
-
-
-        // compute stress n  (local cut forces) 
-        // compute stress_m  (local cut torque) 
-        ChVector<> astress_n;
-        ChVector<> astress_m;
-        ChBeamMaterialInternalData* aplastic_data_old = nullptr;
-        ChBeamMaterialInternalData* aplastic_data = nullptr;
-        std::vector< std::unique_ptr<ChBeamMaterialInternalData> > foo_plastic_data;
-        if (this->section->GetPlasticity()) {       
-            aplastic_data_old = this->plastic_data_old[ig].get();
-            aplastic_data = this->plastic_data[ig].get();
-            if (used_for_differentiation) {
-                // Avoid updating plastic_data_new if ComputeInternalForces_impl() called for computing 
-                // stiffness matrix by backward differentiation. Otherwise pollutes the plastic_data integration.
-                this->section->GetPlasticity()->CreatePlasticityData(1, foo_plastic_data);
-                aplastic_data = foo_plastic_data[0].get();
+            // interpolate rotation of section at given u, to compute R.
+            // Note: this is approximate.
+            // A more precise method: use quaternion splines, as in Kim,Kim and Shin, 1995 paper.
+            N.block(0, nspan - this->order, 2, this->order + 1) = M;
+            ChQuaternion<> q_delta;
+            ChVector<> da = VNULL;
+            ChVector<> delta_rot_dir;
+            double delta_rot_angle;
+            for (int i = 0; i < nodes.size(); ++i) {
+                ChQuaternion<> q_i(state_x.segment(i * 7 + 3, 4));
+                q_delta = nodes[0]->coord.rot.GetConjugate() * q_i;
+                q_delta.Q_to_AngAxis(delta_rot_angle,
+                                     delta_rot_dir);  // a_i = dir_i*angle_i (in spline local reference, -PI..+PI)
+                da += delta_rot_dir * delta_rot_angle * N(0, i);  // a = N_i*a_i
             }
+            ChQuaternion<> qda;
+            qda.Q_from_Rotv(da);
+            ChQuaternion<> qR = nodes[0]->coord.rot * qda;
+
+            // compute the 3x3 rotation matrix R equivalent to quaternion above
+            ChMatrix33<> R(qR);
+
+            // compute abs. spline gradient r'  = dr/ds
+            ChVector<> dr;
+            for (int i = 0; i < nodes.size(); ++i) {
+                ChVector<> r_i(state_x.segment(i * 7, 3));
+                dr += r_i * N(1, i);  // dr/du = N_i'*r_i
+            }
+            // (note r'= dr/ds = dr/du du/ds = dr/du * 1/Jsu   where Jsu computed in SetupInitial)
+            dr *= 1.0 / Jsu;
+
+            // compute abs. time rate of spline gradient  dr'/dt
+            ChVector<> drdt;
+            for (int i = 0; i < nodes.size(); ++i) {
+                ChVector<> drdt_i(state_w.segment(i * 6, 3));
+                drdt += drdt_i * N(1, i);
+            }
+            drdt *= 1.0 / Jsu;
+
+            // compute abs spline rotation gradient q' = dq/ds
+            // But.. easier to compute local gradient of spin vector a' = da/ds
+            da = VNULL;
+            for (int i = 0; i < nodes.size(); ++i) {
+                ChQuaternion<> q_i(state_x.segment(i * 7 + 3, 4));
+                q_delta = qR.GetConjugate() * q_i;
+                q_delta.Q_to_AngAxis(delta_rot_angle,
+                                     delta_rot_dir);  // a_i = dir_i*angle_i (in spline local reference, -PI..+PI)
+                da += delta_rot_dir * delta_rot_angle * N(1, i);  // da/du = N_i'*a_i
+            }
+            // (note a= da/ds = da/du du/ds = da/du * 1/Jsu   where Jsu computed in SetupInitial)
+            da *= 1.0 / Jsu;
+
+            // compute abs rate of spline rotation gradient da'/dt
+            ChVector<> dadt;
+            for (int i = 0; i < nodes.size(); ++i) {
+                ChQuaternion<> q_i(state_x.segment(i * 7 + 3, 4));
+                ChVector<> wl_i(state_w.segment(i * 6 + 3, 3));  //  w in node csys
+                ChVector<> w_i = q_i.Rotate(wl_i);               // w in absolute csys
+                dadt += w_i * N(1, i);
+            }
+            dadt *= 1.0 / Jsu;
+
+            // compute local epsilon strain:  strain_e= R^t * r' - {1, 0, 0}
+            ChVector<> astrain_e = R.transpose() * dr - VECT_X - this->strain_e_0[nspan][ig];
+
+            // compute local time rate of strain:  strain_e_dt = R^t * dr'/dt
+            ChVector<> astrain_e_dt = R.transpose() * drdt;
+
+            // compute local curvature strain:  strain_k= 2*[F(q*)(+)] * q' = 2*[F(q*)(+)] * N_i'*q_i = R^t * a' =
+            // a'_local
+            ChVector<> astrain_k = da - this->strain_k_0[nspan][ig];
+
+            // compute local time rate of curvature strain:
+            ChVector<> astrain_k_dt = R.transpose() * dadt;
+
+            // compute stress n  (local cut forces)
+            // compute stress_m  (local cut torque)
+            ChVector<> astress_n;
+            ChVector<> astress_m;
+            ChBeamMaterialInternalData* aplastic_data_old = nullptr;
+            ChBeamMaterialInternalData* aplastic_data = nullptr;
+            std::vector<std::unique_ptr<ChBeamMaterialInternalData>> foo_plastic_data;
+            if (this->section->GetPlasticity()) {
+                aplastic_data_old = this->plastic_data_old[ig].get();
+                aplastic_data = this->plastic_data[ig].get();
+                if (used_for_differentiation) {
+                    // Avoid updating plastic_data_new if ComputeInternalForces_impl() called for computing
+                    // stiffness matrix by backward differentiation. Otherwise pollutes the plastic_data integration.
+                    this->section->GetPlasticity()->CreatePlasticityData(1, foo_plastic_data);
+                    aplastic_data = foo_plastic_data[0].get();
+                }
+            }
+            this->section->ComputeStress(astress_n, astress_m, astrain_e, astrain_k, aplastic_data, aplastic_data_old);
+
+            if (!used_for_differentiation) {
+                this->stress_n[nspan][ig] = astress_n;
+                this->stress_m[nspan][ig] = astress_m;
+                this->strain_e[nspan][ig] = astrain_e;
+                this->strain_k[nspan][ig] = astrain_k;
+            }
+
+            // add viscous damping
+            if (this->section->GetDamping()) {
+                ChVector<> n_sp;
+                ChVector<> m_sp;
+                this->section->GetDamping()->ComputeStress(n_sp, m_sp, astrain_e_dt, astrain_k_dt);
+                astress_n += n_sp;
+                astress_m += m_sp;
+            }
+
+            // compute internal force, in generalized coordinates:
+
+            ChVector<> stress_n_abs = R * astress_n;
+            ChVector<> stress_m_abs = R * astress_m;
+
+            for (int i = 0; i < nodes.size(); ++i) {
+                // -Force_i = w * Jue * Jsu * Jsu^-1 * N' * R * C * (strain_e - strain_e0)
+                //          = w * Jue                * N'         * stress_n_abs
+                ChVector<> Force_i = stress_n_abs * N(1, i) * (-w * Jue);
+                Fi.segment(i * 6, 3) += Force_i.eigen();
+
+                // -Torque_i =   w * Jue * Jsu * Jsu^-1 * R_i^t * N'               * R * D * (strain_k - strain_k0) +
+                //             + w * Jue * Jsu *          R_i^t * N * skew(r')^t   * R * C * (strain_e - strain_e0)
+                //           =   w * Jue * R_i^t                * N'               * stress_m_abs +
+                //             + w * Jue * Jsu * R_i^t          * N * skew(r')^t   * stress_n_abs
+                ChQuaternion<> q_i(state_x.segment(i * 7 + 3, 4));
+                ChVector<> Torque_i = q_i.RotateBack(stress_m_abs * N(1, i) * (-w * Jue) -
+                                                     Vcross(dr, stress_n_abs) * N(0, i) * (-w * Jue * Jsu));
+                Fi.segment(3 + i * 6, 3) += Torque_i.eigen();
+            }
+
+            // GetLog() << "     gp n." << ig <<   "  J=" << this->Jacobian[ig] << "   strain_e= " << strain_e << "\n";
+            // GetLog() << "                    stress_n= " << stress_n << "\n";
         }
-        this->section->ComputeStress(
-            astress_n,
-            astress_m,
-            astrain_e,
-            astrain_k,
-            aplastic_data,
-            aplastic_data_old);
-
-        if (!used_for_differentiation) {
-            this->stress_n[ig] = astress_n;
-            this->stress_m[ig] = astress_m;
-            this->strain_e[ig] = astrain_e;
-            this->strain_k[ig] = astrain_k;
-        }
-
-        // add viscous damping 
-        if (this->section->GetDamping()) {
-            ChVector<> n_sp;
-            ChVector<> m_sp;
-            this->section->GetDamping()->ComputeStress(
-                n_sp,
-                m_sp,
-                astrain_e_dt,
-                astrain_k_dt);
-            astress_n += n_sp;
-            astress_m += m_sp;
-        }
-
-        // compute internal force, in generalized coordinates:
-
-        ChVector<> stress_n_abs = R * astress_n;
-        ChVector<> stress_m_abs = R * astress_m;
-
-        for (int i = 0; i < nodes.size(); ++i) {
-            // -Force_i = w * Jue * Jsu * Jsu^-1 * N' * R * C * (strain_e - strain_e0)
-            //          = w * Jue                * N'         * stress_n_abs
-            ChVector<> Force_i = stress_n_abs * N(1, i) * (-w * Jue);
-            Fi.segment(i * 6, 3) += Force_i.eigen();
-
-            // -Torque_i =   w * Jue * Jsu * Jsu^-1 * R_i^t * N'               * R * D * (strain_k - strain_k0) +
-            //             + w * Jue * Jsu *          R_i^t * N * skew(r')^t   * R * C * (strain_e - strain_e0)
-            //           =   w * Jue * R_i^t                * N'               * stress_m_abs +
-            //             + w * Jue * Jsu * R_i^t          * N * skew(r')^t   * stress_n_abs
-            ChQuaternion<> q_i(state_x.segment(i * 7 + 3, 4));
-            ChVector<> Torque_i = q_i.RotateBack(stress_m_abs * N(1, i) * (-w * Jue) -
-                Vcross(dr, stress_n_abs) * N(0, i) * (-w * Jue * Jsu));
-            Fi.segment(3 + i * 6, 3) += Torque_i.eigen();
-        }
-
-        //GetLog() << "     gp n." << ig <<   "  J=" << this->Jacobian[ig] << "   strain_e= " << strain_e << "\n";
-        //GetLog() << "                    stress_n= " << stress_n << "\n";
     }
 }
 
@@ -527,7 +514,7 @@ inline void ChElementBeamIGA::ComputeNF(const double U, ChVectorDynamic<>& Qi, d
         u,
         knots,
         M);           ///< h
-    N.block(0, nspan - minspan, 2, this->order + 1) = M;
+    N.block(0, nspan - this->order, 2, this->order + 1) = M;
     ChVector<> dr0;
     for (int i = 0; i< nodes.size(); ++i) {
         dr0 += nodes[i]->GetX0ref().coord.pos * N(1, i);
@@ -560,155 +547,161 @@ inline void ChElementBeamIGA::ComputeNF(const double U, const double V, const do
 
 void ChElementBeamIGA::SetupInitial(ChSystem* system) {
     assert(section);
-    // compute the min span:
-    this->minspan = geometry::ChBasisToolsBspline::FindSpan(this->order, 0.001, knots);
 
     if (this->section->GetPlasticity()) {
         this->section->GetPlasticity()->CreatePlasticityData(int_order_b, this->plastic_data_old);
         this->section->GetPlasticity()->CreatePlasticityData(int_order_b, this->plastic_data);
     }
 
+	int maxspan = knots.size() - 2 - this->order;
     this->length = 0;
+    this->Jacobian_s.resize(maxspan+1, int_order_s);
+    this->Jacobian_b.resize(maxspan+1, int_order_b);
 
-    // get two values of absyssa at extreme of span
-    double u1 = 0;
-    double u2 = 1;
+    this->strain_e_0.resize(maxspan+1);
+    this->strain_k_0.resize(maxspan+1);
+    this->stress_m.resize(maxspan+1);
+    this->stress_n.resize(maxspan+1);
+    this->strain_e.resize(maxspan+1);
+    this->strain_k.resize(maxspan+1);
 
-    double c1 = (u2 - u1) / 2;
-    double c2 = (u2 + u1) / 2;
+    for (int nspan = this->order; nspan <= maxspan; nspan++) {
+        // get two values of absyssa at extreme of span
+        double u1 = knots[nspan];
+        double u2 = knots[nspan + 1];
 
-    // Gauss points for "s" shear components:
+        double c1 = (u2 - u1) / 2;
+        double c2 = (u2 + u1) / 2;
 
-    this->Jacobian_s.resize(int_order_s);
+        // Gauss points for "s" shear components:
 
-    for (int ig = 0; ig < int_order_s; ++ig) {
-        // absyssa in typical -1,+1 range:
-        double eta = ChQuadrature::GetStaticTables()->Lroots[int_order_s - 1][ig];
-        // absyssa in span range:
-        double u = (c1 * eta + c2);
-        // scaling = gauss weight * change of range:
-        double w = ChQuadrature::GetStaticTables()->Weight[int_order_s - 1][ig];
+        
 
-        // compute the basis functions N(u) at given u:
-        int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
+        for (int ig = 0; ig < int_order_s; ++ig) {
+            // absyssa in typical -1,+1 range:
+            double eta = ChQuadrature::GetStaticTables()->Lroots[int_order_s - 1][ig];
+            // absyssa in span range:
+            double u = (c1 * eta + c2);
+            // scaling = gauss weight * change of range:
+            double w = ChQuadrature::GetStaticTables()->Weight[int_order_s - 1][ig];
 
-        // The non-zero basis are stored in M, which fills N in the proper location
-        ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
-        ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
-        // Basis and its derivative are evaluated only in the span, and are 0 outside it
-        N.setZero();
-        geometry::ChBasisToolsBspline::BasisEvaluateDeriv(this->order, nspan, u, knots,
-            M);  ///< here return N and dN/du
-        N.block(0, nspan - minspan, 2, this->order + 1) = M;
-                 // compute reference spline gradient \dot{dr_0} = dr0/du
-        ChVector<> dr0;
-        for (int i = 0; i < nodes.size(); ++i) {
-            dr0 += nodes[i]->GetX0ref().coord.pos * N(1, i);
+            // compute the basis functions N(u) at given u:
+            // The non-zero basis are stored in M, which fills N in the proper location
+            ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
+            ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
+            // Basis and its derivative are evaluated only in the span, and are 0 outside it
+            N.setZero();
+            geometry::ChBasisToolsBspline::BasisEvaluateDeriv(this->order, nspan, u, knots,
+                                                              M);  ///< here return N and dN/du
+            N.block(0, nspan - this->order, 2, this->order + 1) = M;
+            // compute reference spline gradient \dot{dr_0} = dr0/du
+            ChVector<> dr0;
+            for (int i = 0; i < nodes.size(); ++i) {
+                dr0 += nodes[i]->GetX0ref().coord.pos * N(1, i);
+            }
+            this->Jacobian_s(nspan, ig) = dr0.Length();  // J = |dr0/du|
         }
-        this->Jacobian_s[ig] = dr0.Length();  // J = |dr0/du|
+
+        // Gauss points for "b" bend components:
+
+        this->strain_e_0[nspan].resize(int_order_b);
+        this->strain_k_0[nspan].resize(int_order_b);
+        this->stress_m[nspan].resize(int_order_b);
+        this->stress_n[nspan].resize(int_order_b);
+        this->strain_e[nspan].resize(int_order_b);
+        this->strain_k[nspan].resize(int_order_b);
+
+        for (int ig = 0; ig < int_order_b; ++ig) {
+            // absyssa in typical -1,+1 range:
+            double eta = ChQuadrature::GetStaticTables()->Lroots[int_order_b - 1][ig];
+            // absyssa in span range:
+            double u = (c1 * eta + c2);
+            // scaling = gauss weight * change of range:
+            double w = ChQuadrature::GetStaticTables()->Weight[int_order_b - 1][ig];
+
+            // compute the basis functions N(u) at given u:
+            // The non-zero basis are stored in M, which fills N in the proper location
+            ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
+            ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
+            // Basis and its derivative are evaluated only in the span, and are 0 outside it
+            N.setZero();
+            geometry::ChBasisToolsBspline::BasisEvaluateDeriv(this->order, nspan, u, knots,
+                                                              M);  ///< here return N and dN/du
+            N.block(0, nspan - this->order, 2, this->order + 1) = M;
+            // compute reference spline gradient \dot{dr_0} = dr0/du
+            ChVector<> dr0;
+            for (int i = 0; i < nodes.size(); ++i) {
+                double pippo = nodes[i]->GetX0ref().coord.pos.Length();
+                double pluto = N(1, i);
+                double paperino = N(0, i);
+                int topolino = geometry::ChBasisToolsBspline::FindSpan(this->order, 0.001, knots);
+                int minnie = geometry::ChBasisToolsBspline::FindSpan(this->order, 0.999, knots);
+                int topolina = knots.size() - 2 - this->order;
+                dr0 += nodes[i]->GetX0ref().coord.pos * N(1, i);
+            }
+            this->Jacobian_b(nspan, ig) = dr0.Length();  // J = |dr0/du|
+
+            // From now on, compute initial strains as in ComputeInternalForces
+
+            // Jacobian Jsu = ds/du
+            double Jsu = this->Jacobian_b(nspan, ig);
+            // Jacobian Jue = du/deta
+            double Jue = c1;
+
+            // interpolate rotation of section at given u, to compute R.
+            // Note: this is approximate.
+            // A more precise method: use quaternion splines, as in Kim,Kim and Shin, 1995 paper.
+            ChQuaternion<> q_delta;
+            ChVector<> da = VNULL;
+            ChVector<> delta_rot_dir;
+            double delta_rot_angle;
+            for (int i = 0; i < nodes.size(); ++i) {
+                ChQuaternion<> q_i = nodes[i]->GetX0ref().GetRot();  // state_x.ClipQuaternion(i * 7 + 3, 0);
+                q_delta = nodes[0]->GetX0ref().GetRot().GetConjugate() * q_i;
+                q_delta.Q_to_AngAxis(delta_rot_angle,
+                                     delta_rot_dir);  // a_i = dir_i*angle_i (in spline local reference, -PI..+PI)
+                da += delta_rot_dir * delta_rot_angle * N(0, i);  // a = N_i*a_i
+            }
+            ChQuaternion<> qda;
+            qda.Q_from_Rotv(da);
+            ChQuaternion<> qR = nodes[0]->GetX0().GetRot() * qda;
+
+            // compute the 3x3 rotation matrix R equivalent to quaternion above
+            ChMatrix33<> R(qR);
+
+            // compute abs. spline gradient r'  = dr/ds
+            ChVector<> dr;
+            for (int i = 0; i < nodes.size(); ++i) {
+                ChVector<> r_i = nodes[i]->GetX0().GetPos();
+                dr += r_i * N(1, i);  // dr/du = N_i'*r_i
+            }
+            // (note r'= dr/ds = dr/du du/ds = dr/du * 1/Jsu   where Jsu computed in SetupInitial)
+            dr *= 1.0 / Jsu;
+
+            // compute abs spline rotation gradient q' = dq/ds
+            // But.. easier to compute local gradient of spin vector a' = da/ds
+            da = VNULL;
+            for (int i = 0; i < nodes.size(); ++i) {
+                ChQuaternion<> q_i = nodes[i]->GetX0ref().GetRot();
+                q_delta = qR.GetConjugate() * q_i;
+                q_delta.Q_to_AngAxis(delta_rot_angle,
+                                     delta_rot_dir);  // a_i = dir_i*angle_i (in spline local reference, -PI..+PI)
+                da += delta_rot_dir * delta_rot_angle * N(1, i);  // da/du = N_i'*a_i
+            }
+            // (note a= da/ds = da/du du/ds = da/du * 1/Jsu   where Jsu computed in SetupInitial)
+            da *= 1.0 / Jsu;
+
+            // compute local epsilon strain:  strain_e= R^t * r' - {1, 0, 0}
+            this->strain_e_0[nspan][ig] = R.transpose() * dr - VECT_X;
+
+            // compute local curvature strain:  strain_k= 2*[F(q*)(+)] * q' = 2*[F(q*)(+)] * N_i'*q_i = R^t * a' =
+            // a'_local
+            this->strain_k_0[nspan][ig] = da;
+
+            // as a byproduct, also compute length
+            this->length += w * Jsu * Jue;
+        }
     }
-
-    // Gauss points for "b" bend components:
-
-    this->Jacobian_b.resize(int_order_b);
-    this->strain_e_0.resize(int_order_b);
-    this->strain_k_0.resize(int_order_b);
-    this->stress_m.resize(int_order_b);
-    this->stress_n.resize(int_order_b);
-    this->strain_e.resize(int_order_b);
-    this->strain_k.resize(int_order_b);
-
-    for (int ig = 0; ig < int_order_b; ++ig) {
-        // absyssa in typical -1,+1 range:
-        double eta = ChQuadrature::GetStaticTables()->Lroots[int_order_b - 1][ig];
-        // absyssa in span range:
-        double u = (c1 * eta + c2);
-        // scaling = gauss weight * change of range:
-        double w = ChQuadrature::GetStaticTables()->Weight[int_order_b - 1][ig];
-
-        // compute the basis functions N(u) at given u:
-        int nspan = geometry::ChBasisToolsBspline::FindSpan(this->order, u, knots);
-		// The non-zero basis are stored in M, which fills N in the proper location
-        ChMatrixDynamic<> N(2, (int)nodes.size());  // row n.0 contains N, row n.1 contains dN/du
-        ChMatrixDynamic<> M(2, this->order + 1);    // row n.0 contains N, row n.1 contains dN/du
-        //Basis and its derivative are evaluated only in the span, and are 0 outside it
-		N.setZero();
-        geometry::ChBasisToolsBspline::BasisEvaluateDeriv(this->order, nspan, u, knots,
-            M);  ///< here return N and dN/du
-        N.block(0, nspan-minspan, 2, this->order + 1) = M;
-        // compute reference spline gradient \dot{dr_0} = dr0/du
-        ChVector<> dr0;
-        for (int i = 0; i < nodes.size(); ++i) {
-            double pippo = nodes[i]->GetX0ref().coord.pos.Length();
-            double pluto = N(1, i);
-            double paperino = N(0, i);
-            int topolino = geometry::ChBasisToolsBspline::FindSpan(this->order, 0.001, knots);
-            int minnie = geometry::ChBasisToolsBspline::FindSpan(this->order, 0.999, knots);
-            dr0 += nodes[i]->GetX0ref().coord.pos * N(1, i);
-        }
-        this->Jacobian_b[ig] = dr0.Length();  // J = |dr0/du|
-
-                                              // From now on, compute initial strains as in ComputeInternalForces
-
-                                              // Jacobian Jsu = ds/du
-        double Jsu = this->Jacobian_b[ig];
-        // Jacobian Jue = du/deta
-        double Jue = c1;
-
-        // interpolate rotation of section at given u, to compute R.
-        // Note: this is approximate.
-        // A more precise method: use quaternion splines, as in Kim,Kim and Shin, 1995 paper.
-        ChQuaternion<> q_delta;
-        ChVector<> da = VNULL;
-        ChVector<> delta_rot_dir;
-        double delta_rot_angle;
-        for (int i = 0; i < nodes.size(); ++i) {
-            ChQuaternion<> q_i = nodes[i]->GetX0ref().GetRot();  // state_x.ClipQuaternion(i * 7 + 3, 0);
-            q_delta = nodes[0]->GetX0ref().GetRot().GetConjugate() * q_i;
-            q_delta.Q_to_AngAxis(delta_rot_angle,
-                delta_rot_dir);  // a_i = dir_i*angle_i (in spline local reference, -PI..+PI)
-            da += delta_rot_dir * delta_rot_angle * N(0, i);  // a = N_i*a_i
-        }
-        ChQuaternion<> qda;
-        qda.Q_from_Rotv(da);
-        ChQuaternion<> qR = nodes[0]->GetX0().GetRot() * qda;
-
-        // compute the 3x3 rotation matrix R equivalent to quaternion above
-        ChMatrix33<> R(qR);
-
-        // compute abs. spline gradient r'  = dr/ds
-        ChVector<> dr;
-        for (int i = 0; i < nodes.size(); ++i) {
-            ChVector<> r_i = nodes[i]->GetX0().GetPos();
-            dr += r_i * N(1, i);  // dr/du = N_i'*r_i
-        }
-        // (note r'= dr/ds = dr/du du/ds = dr/du * 1/Jsu   where Jsu computed in SetupInitial)
-        dr *= 1.0 / Jsu;
-
-        // compute abs spline rotation gradient q' = dq/ds
-        // But.. easier to compute local gradient of spin vector a' = da/ds
-        da = VNULL;
-        for (int i = 0; i < nodes.size(); ++i) {
-            ChQuaternion<> q_i = nodes[i]->GetX0ref().GetRot();
-            q_delta = qR.GetConjugate() * q_i;
-            q_delta.Q_to_AngAxis(delta_rot_angle,
-                delta_rot_dir);  // a_i = dir_i*angle_i (in spline local reference, -PI..+PI)
-            da += delta_rot_dir * delta_rot_angle * N(1, i);  // da/du = N_i'*a_i
-        }
-        // (note a= da/ds = da/du du/ds = da/du * 1/Jsu   where Jsu computed in SetupInitial)
-        da *= 1.0 / Jsu;
-
-        // compute local epsilon strain:  strain_e= R^t * r' - {1, 0, 0}
-        this->strain_e_0[ig] = R.transpose() * dr - VECT_X;
-
-        // compute local curvature strain:  strain_k= 2*[F(q*)(+)] * q' = 2*[F(q*)(+)] * N_i'*q_i = R^t * a' =
-        // a'_local
-        this->strain_k_0[ig] = da;
-
-        // as a byproduct, also compute length
-        this->length += w * Jsu * Jue;
-    }
-
     // as a byproduct, also compute total mass
     this->mass = this->length * this->section->GetInertia()->GetMassPerUnitLength();
 }

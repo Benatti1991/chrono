@@ -90,16 +90,16 @@ class ChApi ChElementBeamIGA :  public ChElementBeam,
 	std::vector< std::unique_ptr<ChBeamMaterialInternalData> >& GetPlasticData() { return plastic_data;}
 
 	/// Get the stress, as cut-force [N], in a vector with as many elements as Gauss points.
-	std::vector< ChVector<>>& GetStressN() { return this->stress_n; }
+    std::vector < std::vector<ChVector<>>>& GetStressN() { return this->stress_n; }
 
 	/// Get the stress, as cut-torque [Nm], in a vector with as many elements as Gauss points.
-	std::vector< ChVector<>>& GetStressM() { return this->stress_m; }
+    std::vector < std::vector<ChVector<>>>& GetStressM() { return this->stress_m; }
 	
 	/// Get the strain (total=elastic+plastic), as deformation (x is axial strain), in a vector with as many elements as Gauss points.
-	std::vector< ChVector<>>& GetStrainE() { return this->strain_e; }
+    std::vector < std::vector<ChVector<>>>& GetStrainE() { return this->strain_e; }
 	
 	/// Get the strain (total=elastic+plastic), as curvature (x is torsion), in a vector with as many elements as Gauss points.
-	std::vector< ChVector<>>& GetStrainK() { return this->strain_k; }
+    std::vector < std::vector<ChVector<>>>& GetStrainK() { return this->strain_k; }
 
 
 
@@ -353,18 +353,16 @@ class ChApi ChElementBeamIGA :  public ChElementBeam,
 
     int int_order_s;
     int int_order_b;
-    // index of the 1st knot span
-    int minspan = 3;
-    std::vector<double> Jacobian_s;
-    std::vector<double> Jacobian_b;
+    ChMatrixDynamic<> Jacobian_s;
+    ChMatrixDynamic<> Jacobian_b;
 
-    std::vector<ChVector<>> strain_e_0;
-    std::vector<ChVector<>> strain_k_0;
+    std::vector < std::vector<ChVector<>>> strain_e_0;
+    std::vector < std::vector<ChVector<>>> strain_k_0;
 
-    std::vector<ChVector<>> stress_n;
-    std::vector<ChVector<>> stress_m;
-    std::vector<ChVector<>> strain_e;
-    std::vector<ChVector<>> strain_k;
+    std::vector < std::vector<ChVector<>>> stress_n;
+    std::vector < std::vector<ChVector<>>> stress_m;
+    std::vector < std::vector<ChVector<>>> strain_e;
+    std::vector < std::vector<ChVector<>>> strain_k;
 
     std::vector<std::unique_ptr<ChBeamMaterialInternalData>> plastic_data_old;
     std::vector<std::unique_ptr<ChBeamMaterialInternalData>> plastic_data;
